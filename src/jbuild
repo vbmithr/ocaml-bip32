@@ -1,4 +1,4 @@
 (library
  ((name bip32)
   (public_name bip32)
-  (libraries (cstruct digestif.c secp256k1))))
+  (libraries (hex cstruct digestif.c secp256k1 base58))))
