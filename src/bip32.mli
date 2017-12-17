@@ -1,25 +1,27 @@
 open Secp256k1
 
-type 'a key
-type secret = Secret.t key
-type public = Public.t key
+type secret = Secret.t
+type public = Public.t
 
-val pp_secret : Format.formatter -> secret -> unit
-val pp_public : Format.formatter -> public -> unit
+type _ kind =
+  | Sk : secret -> secret kind
+  | Pk : public -> public kind
 
-val key : 'a key -> 'a
-val chaincode : _ key -> Cstruct.t
+type 'a key = private {
+  k : 'a kind ;
+  c : Cstruct.t ;
+  path : Int32.t list ;
+  parent : Cstruct.t ;
+}
 
-val of_entropy_exn : Cstruct.t -> secret
-val neuterize : secret -> public
+val pp : Format.formatter -> _ key -> unit
 
-val secret_child_of_secret : secret -> Int32.t -> secret
-val public_child_of_public : public -> Int32.t -> public
-val public_child_of_secret : secret -> Int32.t -> public
-val derive_secret : secret -> Int32.t list -> secret
-val derive_public : public -> Int32.t list -> public
+val of_entropy_exn : Cstruct.t -> secret key
+val neuterize : _ key -> public key
 
-val base58_of_secret : ?testnet:bool -> secret -> Base58.Bitcoin.t
-val base58_of_public : ?testnet:bool -> public -> Base58.Bitcoin.t
-val secret_of_base58 : Base58.Bitcoin.t -> secret
-val public_of_base58 : Base58.Bitcoin.t -> public
+val derive : 'a key -> Int32.t -> 'a key
+val derive_path : 'a key -> Int32.t list -> 'a key
+
+val of_base58_sk : Base58.Bitcoin.t -> secret key
+val of_base58_pk : Base58.Bitcoin.t -> public key
+val to_base58 : ?testnet:bool -> _ key -> Base58.Bitcoin.t

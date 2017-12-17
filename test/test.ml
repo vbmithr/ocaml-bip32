@@ -2,9 +2,9 @@ open Bip32
 
 let check sk =
   let pk = neuterize sk in
-  Format.printf "secret: %a@,public: %a@," pp_secret sk pp_public pk ;
-  let b58sk = base58_of_secret sk in
-  let b58pk = base58_of_public pk in
+  Format.printf "secret: %a@,public: %a@," pp sk pp pk ;
+  let b58sk = to_base58 sk in
+  let b58pk = to_base58 pk in
   Base58.Bitcoin.to_string b58pk,
   Base58.Bitcoin.to_string b58sk
 
@@ -14,7 +14,7 @@ let process seed paths expected =
   Format.print_newline () ;
   assert (check m = List.hd expected) ;
   ListLabels.fold_left2 ~init:m paths (List.tl expected) ~f:begin fun a p e ->
-    let sk = secret_child_of_secret a p in
+    let sk = derive a p in
     let checked = check sk in
     (* Printf.printf "%s\n%s\n%s\n%s\n" (fst e) (snd e) (fst checked) (snd checked) ; *)
     assert (checked = e) ;
