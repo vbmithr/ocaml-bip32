@@ -3,18 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open Secp256k1
-
-module type CRYPTO = sig
-  val sha256 : Cstruct.t -> Cstruct.t
-  val ripemd160 : Cstruct.t -> Cstruct.t
-  val hmac_sha512 : key:Cstruct.t -> Cstruct.t -> Cstruct.t
-
-  val ctx : Context.t
-end
-
-type secret = Secret.t
-type public = Public.t
+type secret = Secp256k1.Secret.t
+type public = Secp256k1.Public.t
 
 type _ kind =
   | Sk : secret -> secret kind
@@ -27,16 +17,28 @@ type 'a key = private {
   parent : Cstruct.t ;
 }
 
-val create_key :
-  ?parent:Cstruct.t -> 'a kind -> Cstruct.t -> Int32.t list -> 'a key
+module type CRYPTO = sig
+  val sha256 : Cstruct.t -> Cstruct.t
+  val ripemd160 : Cstruct.t -> Cstruct.t
+  val hmac_sha512 : key:Cstruct.t -> Cstruct.t -> Cstruct.t
+
+  val ctx : Secp256k1.Context.t
+end
 
 module type S = sig
   val pp : Format.formatter -> _ key -> unit
   val of_entropy : Cstruct.t -> secret key option
+  val of_entropy_exn : Cstruct.t -> secret key
   val neuterize : _ key -> public key
   val derive : 'a key -> Int32.t -> 'a key
   val derive_path : 'a key -> Int32.t list -> 'a key
+
+  val secret_of_bytes : Cstruct.t -> secret key option
+  val secret_of_bytes_exn : Cstruct.t -> secret key
+  val public_of_bytes : Cstruct.t -> public key option
+  val public_of_bytes_exn : Cstruct.t -> public key
   val to_bytes : 'a key -> string
+  val to_cstruct : 'a key -> Cstruct.t
 end
 
 module Make (Crypto : CRYPTO) : S

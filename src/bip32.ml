@@ -41,10 +41,17 @@ let create_key ?(parent=Cstruct.create 20) k c path = { k ; c ; path ; parent }
 module type S = sig
   val pp : Format.formatter -> _ key -> unit
   val of_entropy : Cstruct.t -> secret key option
+  val of_entropy_exn : Cstruct.t -> secret key
   val neuterize : _ key -> public key
   val derive : 'a key -> Int32.t -> 'a key
   val derive_path : 'a key -> Int32.t list -> 'a key
+
+  val secret_of_bytes : Cstruct.t -> secret key option
+  val secret_of_bytes_exn : Cstruct.t -> secret key
+  val public_of_bytes : Cstruct.t -> public key option
+  val public_of_bytes_exn : Cstruct.t -> public key
   val to_bytes : 'a key -> string
+  val to_cstruct : 'a key -> Cstruct.t
 end
 
 module Make (Crypto : CRYPTO) = struct
@@ -83,6 +90,11 @@ module Make (Crypto : CRYPTO) = struct
     | None -> None
     | Some k -> Some (create_key (Sk k) (Cstruct.sub m 32 32) [])
 
+  let of_entropy_exn entropy =
+    match of_entropy entropy with
+    | None -> invalid_arg "of_entropy_exn"
+    | Some sk -> sk
+
   let neuterize : type a. a key -> public key = fun k ->
     match k.k with
     | Sk sk ->
@@ -120,6 +132,37 @@ module Make (Crypto : CRYPTO) = struct
     type a. a key -> Int32.t list -> a key = fun k path ->
     ListLabels.fold_left path ~init:k ~f:derive
 
+  let secret_of_bytes_exn cs =
+    let _depth = Cstruct.get_uint8 cs 0 in
+    let parent = Cstruct.sub cs 1 4 in
+    let child_number = Cstruct.BE.get_uint32 cs 5 in
+    let chaincode = Cstruct.sub cs 9 32 in
+    let secret = Secret.read_exn ctx cs.buffer ~pos:41 in
+    create_key ~parent (Sk secret) chaincode [child_number]
+
+  let public_of_bytes_exn cs =
+    let _depth = Cstruct.get_uint8 cs 0 in
+    let parent = Cstruct.sub cs 1 4 in
+    let child_number = Cstruct.BE.get_uint32 cs 5 in
+    let chaincode = Cstruct.sub cs 9 32 in
+    let public = Public.read_exn ctx cs.buffer ~pos:40 in
+    create_key ~parent (Pk public) chaincode [child_number]
+
+  let secret_of_bytes cs =
+    try Some (secret_of_bytes_exn cs) with _ -> None
+  let public_of_bytes cs =
+    try Some (public_of_bytes_exn cs) with _ -> None
+
+  let secret_of_bytes_exn cs =
+    match secret_of_bytes cs with
+    | None -> invalid_arg "secret_of_bytes_exn"
+    | Some sk -> sk
+
+  let public_of_bytes_exn cs =
+    match public_of_bytes cs with
+    | None -> invalid_arg "public_of_bytes_exn"
+    | Some pk -> pk
+
   let to_bytes : type a. a key -> string = fun { k ; c ; path ; parent } ->
     let buf = Buffer.create 74 in
     Buffer.add_char buf (Char.chr (List.length path)) ;
@@ -138,6 +181,9 @@ module Make (Crypto : CRYPTO) = struct
         Buffer.add_string buf Cstruct.(of_bigarray pk |> to_string)
     end ;
     Buffer.contents buf
+
+  let to_cstruct key =
+    Cstruct.of_string (to_bytes key)
 end
 
 (*---------------------------------------------------------------------------

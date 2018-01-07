@@ -7,8 +7,10 @@ open Secp256k1
 open Bip32
 
 module type S = sig
-  val of_base58_sk : Base58.Bitcoin.t -> secret key
-  val of_base58_pk : Base58.Bitcoin.t -> public key
+  val of_base58_sk : Base58.Bitcoin.t -> secret key option
+  val of_base58_pk : Base58.Bitcoin.t -> public key option
+  val of_base58_sk_exn : Base58.Bitcoin.t -> secret key
+  val of_base58_pk_exn : Base58.Bitcoin.t -> public key
   val to_base58 : ?testnet:bool -> _ key -> Base58.Bitcoin.t
 end
 
@@ -26,33 +28,27 @@ module Make (Crypto : CRYPTO) = struct
     in
     Base58.Bitcoin.create ~version ~payload:(to_bytes s)
 
-  let of_payload_secret cs =
-    let _depth = Cstruct.get_uint8 cs 0 in
-    let parent = Cstruct.sub cs 1 4 in
-    let child_number = Cstruct.BE.get_uint32 cs 5 in
-    let chaincode = Cstruct.sub cs 9 32 in
-    let secret = Secret.read_exn ctx cs.buffer ~pos:41 in
-    create_key ~parent (Sk secret) chaincode [child_number]
-
-  let of_payload_public cs =
-    let _depth = Cstruct.get_uint8 cs 0 in
-    let parent = Cstruct.sub cs 1 4 in
-    let child_number = Cstruct.BE.get_uint32 cs 5 in
-    let chaincode = Cstruct.sub cs 9 32 in
-    let public = Public.read_exn ctx cs.buffer ~pos:40 in
-    create_key ~parent (Pk public) chaincode [child_number]
-
   let of_base58_sk { Base58.Bitcoin.version ; payload } =
     match version with
     | BIP32_priv | Testnet_BIP32_priv ->
-      of_payload_secret (Cstruct.of_string payload)
-    | _ -> invalid_arg "secret_of_base58: not a BIP32 secret key"
+      secret_of_bytes (Cstruct.of_string payload)
+    | _ -> None
 
   let of_base58_pk { Base58.Bitcoin.version ; payload } =
     match version with
     | BIP32_pub | Testnet_BIP32_pub ->
-      of_payload_public (Cstruct.of_string payload)
-    | _ -> invalid_arg "public_of_base58: not a BIP32 public key"
+      public_of_bytes (Cstruct.of_string payload)
+    | _ -> None
+
+  let of_base58_sk_exn b58 =
+    match of_base58_sk b58 with
+    | Some sk -> sk
+    | None -> invalid_arg "of_base58_sk_exn"
+
+  let of_base58_pk_exn b58 =
+    match of_base58_pk b58 with
+    | Some pk -> pk
+    | None -> invalid_arg "of_base58_pk_exn"
 end
 
 (*---------------------------------------------------------------------------
