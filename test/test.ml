@@ -1,4 +1,26 @@
 open Bip32
+open Bip32_base58
+
+module Crypto = struct
+  open Cstruct
+  open Digestif
+  let hmac_sha512 ~key s =
+    let key = to_bigarray key in
+    let s = to_bigarray s in
+    SHA512.Bigstring.hmac ~key s |>
+    of_bigarray
+  let sha256 s =
+    s |> to_bigarray |> SHA256.Bigstring.digest |> of_bigarray
+  let ripemd160 s =
+    s |> to_bigarray |> RMD160.Bigstring.digest |> of_bigarray
+
+  let ctx = Secp256k1.Context.create [Sign]
+end
+
+module BIP32 = Bip32.Make(Crypto)
+module BIP32_base58 = Bip32_base58.Make(Crypto)
+open BIP32
+open BIP32_base58
 
 let check sk =
   let pk = neuterize sk in
@@ -10,17 +32,19 @@ let check sk =
 
 let process seed paths expected =
   let seed = Hex.to_cstruct seed in
-  let m = of_entropy_exn seed in
-  Format.print_newline () ;
-  assert (check m = List.hd expected) ;
-  ListLabels.fold_left2 ~init:m paths (List.tl expected) ~f:begin fun a p e ->
-    let sk = derive a p in
-    let checked = check sk in
-    (* Printf.printf "%s\n%s\n%s\n%s\n" (fst e) (snd e) (fst checked) (snd checked) ; *)
-    assert (checked = e) ;
-    sk
-  end |>
-  ignore
+  match of_entropy seed with
+  | None -> assert false
+  | Some m ->
+    Format.print_newline () ;
+    assert (check m = List.hd expected) ;
+    ListLabels.fold_left2 ~init:m paths (List.tl expected) ~f:begin fun a p e ->
+      let sk = derive a p in
+      let checked = check sk in
+      (* Printf.printf "%s\n%s\n%s\n%s\n" (fst e) (snd e) (fst checked) (snd checked) ; *)
+      assert (checked = e) ;
+      sk
+    end |>
+    ignore
 
 let harden i =
   Int32.logor 0x8000_0000l i

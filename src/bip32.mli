@@ -1,5 +1,13 @@
 open Secp256k1
 
+module type CRYPTO = sig
+  val sha256 : Cstruct.t -> Cstruct.t
+  val ripemd160 : Cstruct.t -> Cstruct.t
+  val hmac_sha512 : key:Cstruct.t -> Cstruct.t -> Cstruct.t
+
+  val ctx : Context.t
+end
+
 type secret = Secret.t
 type public = Public.t
 
@@ -14,14 +22,16 @@ type 'a key = private {
   parent : Cstruct.t ;
 }
 
-val pp : Format.formatter -> _ key -> unit
+val create_key :
+  ?parent:Cstruct.t -> 'a kind -> Cstruct.t -> Int32.t list -> 'a key
 
-val of_entropy_exn : Cstruct.t -> secret key
-val neuterize : _ key -> public key
+module type S = sig
+  val pp : Format.formatter -> _ key -> unit
+  val of_entropy : Cstruct.t -> secret key option
+  val neuterize : _ key -> public key
+  val derive : 'a key -> Int32.t -> 'a key
+  val derive_path : 'a key -> Int32.t list -> 'a key
+  val to_bytes : 'a key -> string
+end
 
-val derive : 'a key -> Int32.t -> 'a key
-val derive_path : 'a key -> Int32.t list -> 'a key
-
-val of_base58_sk : Base58.Bitcoin.t -> secret key
-val of_base58_pk : Base58.Bitcoin.t -> public key
-val to_base58 : ?testnet:bool -> _ key -> Base58.Bitcoin.t
+module Make (Crypto : CRYPTO) : S
