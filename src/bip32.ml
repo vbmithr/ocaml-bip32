@@ -50,7 +50,6 @@ module type S = sig
   val secret_of_bytes_exn : Cstruct.t -> secret key
   val public_of_bytes : Cstruct.t -> public key option
   val public_of_bytes_exn : Cstruct.t -> public key
-  val to_bytes : 'a key -> string
   val to_cstruct : 'a key -> Cstruct.t
 end
 
@@ -163,27 +162,17 @@ module Make (Crypto : CRYPTO) = struct
     | None -> invalid_arg "public_of_bytes_exn"
     | Some pk -> pk
 
-  let to_bytes : type a. a key -> string = fun { k ; c ; path ; parent } ->
-    let buf = Buffer.create 74 in
-    Buffer.add_char buf (Char.chr (List.length path)) ;
-    Buffer.add_string buf Cstruct.(sub parent 0 4 |> to_string) ;
-    let cs = Cstruct.create 4 in
-    Cstruct.BE.set_uint32 cs 0 (match path with [] -> 0l  | i :: _ -> i) ;
-    Buffer.add_string buf (Cstruct.to_string cs) ;
-    Buffer.add_string buf (Cstruct.to_string c) ;
+  let to_cstruct : type a. a key -> Cstruct.t = fun { k ; c ; path ; parent } ->
+    let buf = Cstruct.create 74 in
+    Cstruct.set_uint8 buf 0 (List.length path) ;
+    Cstruct.blit parent 0 buf 1 4 ;
+    Cstruct.BE.set_uint32 buf 5 (match path with [] -> 0l  | i :: _ -> i) ;
+    Cstruct.blit c 0 buf 9 32 ;
     begin match k with
-      | Sk sk ->
-        let cs = Cstruct.create 33 in
-        Secret.write cs.buffer ~pos:1 sk ;
-        Buffer.add_string buf (Cstruct.to_string cs)
-      | Pk pk ->
-        let pk = Public.to_bytes ~compress:true ctx pk in
-        Buffer.add_string buf Cstruct.(of_bigarray pk |> to_string)
+      | Sk sk -> Secret.write buf.buffer ~pos:42 sk ;
+      | Pk pk -> ignore (Public.write ~compress:true ctx buf.buffer ~pos:41 pk)
     end ;
-    Buffer.contents buf
-
-  let to_cstruct key =
-    Cstruct.of_string (to_bytes key)
+    buf
 end
 
 (*---------------------------------------------------------------------------

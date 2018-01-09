@@ -26,7 +26,7 @@ module Make (Crypto : CRYPTO) = struct
       | Sk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_priv else BIP32_priv)
       | Pk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_pub else BIP32_pub)
     in
-    Base58.Bitcoin.create ~version ~payload:(to_bytes s)
+    Base58.Bitcoin.create ~version ~payload:(to_cstruct s |> Cstruct.to_string)
 
   let of_base58_sk { Base58.Bitcoin.version ; payload } =
     match version with

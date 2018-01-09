@@ -37,7 +37,6 @@ module type S = sig
   val secret_of_bytes_exn : Cstruct.t -> secret key
   val public_of_bytes : Cstruct.t -> public key option
   val public_of_bytes_exn : Cstruct.t -> public key
-  val to_bytes : 'a key -> string
   val to_cstruct : 'a key -> Cstruct.t
 end
 
