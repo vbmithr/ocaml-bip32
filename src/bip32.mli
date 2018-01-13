@@ -3,15 +3,10 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-type secret = Secp256k1.Secret.t
-type public = Secp256k1.Public.t
+open Secp256k1
 
-type _ kind =
-  | Sk : secret -> secret kind
-  | Pk : public -> public kind
-
-type 'a key = private {
-  k : 'a kind ;
+type 'a t = private {
+  k : 'a Key.t ;
   c : Cstruct.t ;
   path : Int32.t list ;
   parent : Cstruct.t ;
@@ -26,18 +21,18 @@ module type CRYPTO = sig
 end
 
 module type S = sig
-  val pp : Format.formatter -> _ key -> unit
-  val of_entropy : Cstruct.t -> secret key option
-  val of_entropy_exn : Cstruct.t -> secret key
-  val neuterize : _ key -> public key
-  val derive : 'a key -> Int32.t -> 'a key
-  val derive_path : 'a key -> Int32.t list -> 'a key
+  val pp : Format.formatter -> _ t -> unit
+  val of_entropy : Cstruct.t -> (Key.secret t, string) result
+  val of_entropy_exn : Cstruct.t -> Key.secret t
+  val neuterize : _ t -> Key.public t
+  val derive : 'a t -> Int32.t -> 'a t
+  val derive_path : 'a t -> Int32.t list -> 'a t
 
-  val secret_of_bytes : Cstruct.t -> secret key option
-  val secret_of_bytes_exn : Cstruct.t -> secret key
-  val public_of_bytes : Cstruct.t -> public key option
-  val public_of_bytes_exn : Cstruct.t -> public key
-  val to_cstruct : 'a key -> Cstruct.t
+  val secret_of_bytes : Cstruct.t -> Key.secret t option
+  val secret_of_bytes_exn : Cstruct.t -> Key.secret t
+  val public_of_bytes : Cstruct.t -> Key.public t option
+  val public_of_bytes_exn : Cstruct.t -> Key.public t
+  val to_cstruct : 'a t -> Cstruct.t
 end
 
 module Make (Crypto : CRYPTO) : S

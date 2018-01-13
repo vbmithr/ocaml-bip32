@@ -33,8 +33,8 @@ let check sk =
 let process seed paths expected =
   let seed = Hex.to_cstruct seed in
   match of_entropy seed with
-  | None -> assert false
-  | Some m ->
+  | Error _ -> assert false
+  | Ok m ->
     Format.print_newline () ;
     assert (check m = List.hd expected) ;
     ListLabels.fold_left2 ~init:m paths (List.tl expected) ~f:begin fun a p e ->

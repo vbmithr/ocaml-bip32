@@ -7,11 +7,11 @@ open Secp256k1
 open Bip32
 
 module type S = sig
-  val of_base58_sk : Base58.Bitcoin.t -> secret key option
-  val of_base58_pk : Base58.Bitcoin.t -> public key option
-  val of_base58_sk_exn : Base58.Bitcoin.t -> secret key
-  val of_base58_pk_exn : Base58.Bitcoin.t -> public key
-  val to_base58 : ?testnet:bool -> _ key -> Base58.Bitcoin.t
+  val of_base58_sk : Base58.Bitcoin.t -> Key.secret t option
+  val of_base58_pk : Base58.Bitcoin.t -> Key.public t option
+  val of_base58_sk_exn : Base58.Bitcoin.t -> Key.secret t
+  val of_base58_pk_exn : Base58.Bitcoin.t -> Key.public t
+  val to_base58 : ?testnet:bool -> _ t -> Base58.Bitcoin.t
 end
 
 module Make (Crypto : CRYPTO) = struct
@@ -20,11 +20,11 @@ module Make (Crypto : CRYPTO) = struct
   open BIP32
 
   let to_base58 :
-    type a. ?testnet:bool -> a key -> Base58.Bitcoin.t = fun ?(testnet=false) s ->
+    type a. ?testnet:bool -> a t -> Base58.Bitcoin.t = fun ?(testnet=false) s ->
     let version =
       match s.k with
-      | Sk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_priv else BIP32_priv)
-      | Pk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_pub else BIP32_pub)
+      | Key.Sk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_priv else BIP32_priv)
+      | Key.Pk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_pub else BIP32_pub)
     in
     Base58.Bitcoin.create ~version ~payload:(to_cstruct s |> Cstruct.to_string)
 
