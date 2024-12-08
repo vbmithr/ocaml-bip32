@@ -157,12 +157,12 @@ module Make (Crypto : CRYPTO) = struct
     (* not initialized to zero! *)
     Bigstringaf.set buf 0 (List.length path |> Char.chr);
     Bigstringaf.blit parent ~src_off:0 buf ~dst_off:1 ~len:4;
-    Bigstringaf.set_int32_be
-      buf
-      5
-      (match path with
-       | [] -> 0l
-       | i :: _ -> i);
+    let path =
+      match path with
+      | [] -> 0l
+      | i :: _ -> i
+    in
+    Bigstringaf.set_int32_be buf 5 path;
     Bigstringaf.blit c ~src_off:0 buf ~dst_off:9 ~len:32;
     Bigstringaf.set buf 41 '\x00';
     let _nb_written =
