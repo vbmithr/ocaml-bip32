@@ -12,6 +12,11 @@ bug-reports: "https://github.com/username/reponame/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.16"}
+  "base58"
+  "bip32"
+  "alcotest" {with-test}
+  "digestif" {with-test}
+  "hex" {with-test}
   "odoc" {with-doc}
 ]
 build: [

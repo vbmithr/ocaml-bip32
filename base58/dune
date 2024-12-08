@@ -1,6 +1,8 @@
 (library
  (name bip32_base58)
  (public_name bip32-base58)
- (libraries bip32 base58)
+ (libraries
+   bip32
+   base58)
 )
 
