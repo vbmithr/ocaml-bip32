@@ -6,7 +6,8 @@
 open Bip32
 include module type of Bip32_base58_intf
 
-module Make (_ : CRYPTO) (B58 : Base58.S with type version = Base58.bitcoin_version) : S with type b58 := B58.t
+module Make (_ : CRYPTO) (B58 : Base58.S with type version = Base58.bitcoin_version) :
+  S with type b58 := B58.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff
