@@ -6,47 +6,40 @@
 open Secp256k1
 open Bip32
 
-module type S = sig
-  val of_base58_sk : Base58.Bitcoin.t -> Key.secret t option
-  val of_base58_pk : Base58.Bitcoin.t -> Key.public t option
-  val of_base58_sk_exn : Base58.Bitcoin.t -> Key.secret t
-  val of_base58_pk_exn : Base58.Bitcoin.t -> Key.public t
-  val to_base58 : ?testnet:bool -> _ t -> Base58.Bitcoin.t
-end
+include Bip32_base58_intf
 
-module Make (Crypto : CRYPTO) = struct
-  module BIP32 = Make(Crypto)
-  open Crypto
-  open BIP32
+module Make (Crypto : CRYPTO) (B58 : Base58.S with type version := Base58.bitcoin_version) = struct
+  open Make(Crypto)
 
-  let to_base58 :
-    type a. ?testnet:bool -> a t -> Base58.Bitcoin.t = fun ?(testnet=false) s ->
+  let to_base58 (type a) ?(testnet=false) ctx (s : a t) =
+    let open Base58 in
     let version =
       match s.k with
-      | Key.Sk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_priv else BIP32_priv)
-      | Key.Pk _ -> Base58.Bitcoin.(if testnet then Testnet_BIP32_pub else BIP32_pub)
+      | Key.Sk _ -> (if testnet then Testnet_BIP32_priv else BIP32_priv)
+      | Key.Pk _ -> (if testnet then Testnet_BIP32_pub else BIP32_pub)
     in
-    Base58.Bitcoin.create ~version ~payload:(to_cstruct s |> Cstruct.to_string)
+    let payload = to_bigstring ctx s |> Bigstringaf.to_string in
+    B58.create ~version ~payload
 
-  let of_base58_sk { Base58.Bitcoin.version ; payload } =
+  let of_base58_sk ctx { B58.version ; payload } =
     match version with
     | BIP32_priv | Testnet_BIP32_priv ->
-      secret_of_bytes (Cstruct.of_string payload)
+      secret_of_bytes ctx (Bigstringaf.of_string payload ~off:0 ~len:(String.length payload))
     | _ -> None
 
-  let of_base58_pk { Base58.Bitcoin.version ; payload } =
+  let of_base58_pk ctx { B58.version ; payload } =
     match version with
     | BIP32_pub | Testnet_BIP32_pub ->
-      public_of_bytes (Cstruct.of_string payload)
+      public_of_bytes ctx (Bigstringaf.of_string payload ~off:0 ~len:(String.length payload))
     | _ -> None
 
-  let of_base58_sk_exn b58 =
-    match of_base58_sk b58 with
+  let of_base58_sk_exn ctx b58 =
+    match of_base58_sk ctx b58 with
     | Some sk -> sk
     | None -> invalid_arg "of_base58_sk_exn"
 
-  let of_base58_pk_exn b58 =
-    match of_base58_pk b58 with
+  let of_base58_pk_exn ctx b58 =
+    match of_base58_pk ctx b58 with
     | Some pk -> pk
     | None -> invalid_arg "of_base58_pk_exn"
 end

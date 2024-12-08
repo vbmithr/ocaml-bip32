@@ -1,0 +1,10 @@
+(test
+ (name test)
+ (libraries
+   hex
+   bip32
+   bip32-base58
+   digestif.c
+   alcotest
+ )
+)

@@ -1,0 +1,9 @@
+(library
+ (name bip32)
+ (public_name bip32)
+ (libraries
+   hex
+   bigstringaf
+   secp256k1)
+)
+

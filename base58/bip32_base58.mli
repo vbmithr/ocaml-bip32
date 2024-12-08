@@ -3,18 +3,10 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-open Secp256k1
 open Bip32
+include module type of Bip32_base58_intf
 
-module type S = sig
-  val of_base58_sk : Base58.Bitcoin.t -> Key.secret t option
-  val of_base58_pk : Base58.Bitcoin.t -> Key.public t option
-  val of_base58_sk_exn : Base58.Bitcoin.t -> Key.secret t
-  val of_base58_pk_exn : Base58.Bitcoin.t -> Key.public t
-  val to_base58 : ?testnet:bool -> _ t -> Base58.Bitcoin.t
-end
-
-module Make (Crypto : CRYPTO) : S
+module Make (_ : CRYPTO) (B58 : Base58.S with type version = Base58.bitcoin_version) : S with type b58 := B58.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff

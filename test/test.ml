@@ -1,55 +1,57 @@
-open Bip32
-open Bip32_base58
+open Alcotest
 
 module Crypto = struct
-  open Cstruct
   open Digestif
   let hmac_sha512 ~key s =
-    let key = to_bigarray key in
-    let s = to_bigarray s in
-    SHA512.Bigstring.hmac ~key s |>
-    of_bigarray
+    let key = Bigstringaf.to_string key in
+    SHA512.hmac_bigstring ~key s |> SHA512.to_raw_string|> fun s ->
+    Bigstringaf.of_string s ~off:0 ~len:(String.length s)
   let sha256 s =
-    s |> to_bigarray |> SHA256.Bigstring.digest |> of_bigarray
-  let ripemd160 s =
-    s |> to_bigarray |> RMD160.Bigstring.digest |> of_bigarray
+    SHA256.digest_bigstring s |> SHA256.to_raw_string |> fun s ->
+    Bigstringaf.of_string s ~off:0 ~len:(String.length s)
 
-  let ctx = Secp256k1.Context.create [Sign]
+  let ripemd160 s =
+    RMD160.digest_bigstring s |> RMD160.to_raw_string |> fun s ->
+    Bigstringaf.of_string s ~off:0 ~len:(String.length s)
+end
+
+module CryptoB58 = struct
+  open Digestif
+  let sha256 s = SHA256.digest_string s |> SHA256.to_raw_string
 end
 
 module BIP32 = Bip32.Make(Crypto)
-module BIP32_base58 = Bip32_base58.Make(Crypto)
+module B58 = Base58.Bitcoin(CryptoB58)
+module BIP32_base58 = Bip32_base58.Make(Crypto)(B58)
+
 open BIP32
 open BIP32_base58
 
-let check sk =
-  let pk = neuterize sk in
-  Format.printf "secret: %a@,public: %a@," pp sk pp pk ;
-  let b58sk = to_base58 sk in
-  let b58pk = to_base58 pk in
-  Base58.Bitcoin.to_string b58pk,
-  Base58.Bitcoin.to_string b58sk
+let check_bip32 ctx sk (exp_pk, exp_sk) =
+  let pk = neuterize ctx sk in
+  Format.printf "secret: %a@,public: %a@," (pp ctx) sk (pp ctx) pk ;
+  let b58sk = to_base58 ctx sk in
+  let b58pk = to_base58 ctx pk in
+  check string "pk" exp_pk (B58.to_string b58pk);
+  check string "sk" exp_sk (B58.to_string b58sk)
 
-let process seed paths expected =
-  let seed = Hex.to_cstruct seed in
-  match of_entropy seed with
-  | Error _ -> assert false
-  | Ok m ->
-    Format.print_newline () ;
-    assert (check m = List.hd expected) ;
-    ListLabels.fold_left2 ~init:m paths (List.tl expected) ~f:begin fun a p e ->
-      let sk = derive a p in
-      let checked = check sk in
-      (* Printf.printf "%s\n%s\n%s\n%s\n" (fst e) (snd e) (fst checked) (snd checked) ; *)
-      assert (checked = e) ;
-      sk
-    end |>
-    ignore
+let process ctx seed paths expected =
+  let seed = Hex.to_bigstring seed in
+  let m = of_entropy_exn ctx seed in
+  Format.print_newline () ;
+  check_bip32 ctx m (List.hd expected) ;
+  ListLabels.fold_left2 ~init:m paths (List.tl expected) ~f:begin fun a p e ->
+    let sk = derive ctx a p in
+    check_bip32 ctx sk e;
+    (* Printf.printf "%s\n%s\n%s\n%s\n" (fst e) (snd e) (fst checked) (snd checked) ; *)
+    sk
+  end |>
+  ignore
 
 let harden i =
   Int32.logor 0x8000_0000l i
 
-let v1 () = process
+let v1 ctx = process ctx
     (`Hex "000102030405060708090a0b0c0d0e0f")
     [0x8000_0000l; 1l; 0x8000_0002l; 2l; 1000000000l]
     [
@@ -67,7 +69,7 @@ let v1 () = process
       "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76"
     ]
 
-let v2 () = process
+let v2 ctx = process ctx
     (`Hex "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542")
     [0l; harden 2147483647l; 1l; harden 2147483646l; 2l]
     [
@@ -85,7 +87,7 @@ let v2 () = process
       "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j"
     ]
 
-let v3 () = process
+let v3 ctx = process ctx
     (`Hex "4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be")
     [harden 0l]
     [
@@ -96,12 +98,14 @@ let v3 () = process
     ]
 
 let vectors = [
-  "v1", `Quick, v1 ;
-  "v2", `Quick, v2 ;
-  "v3", `Quick, v3 ;
+  test_case "v1" `Quick v1 ;
+  test_case "v2" `Quick v2 ;
+  test_case "v3" `Quick v3 ;
 ]
 
 let () =
-  Alcotest.run "Bip32" [
+  let ctx = Secp256k1.Context.(create []) in
+  let ctx = Cmdliner.Term.const ctx in
+  run_with_args "Bip32" ctx [
     "vectors", vectors ;
   ]
